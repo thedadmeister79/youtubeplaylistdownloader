@@ -20,7 +20,6 @@ def download_and_process(playlist_url, artist, album):
     output_dir = "downloaded_mp3s"
     os.makedirs(output_dir, exist_ok=True)
 
-    # yt-dlp command
     ytdlp_command = [
         "yt-dlp",
         "-x",
@@ -30,10 +29,8 @@ def download_and_process(playlist_url, artist, album):
         playlist_url
     ]
 
-    # Run yt-dlp
     subprocess.run(ytdlp_command)
 
-    # Rename and tag files
     mp3_files = sorted(Path(output_dir).glob("*.mp3"))
     for index, file_path in enumerate(mp3_files, start=1):
         try:
@@ -52,22 +49,30 @@ def download_and_process(playlist_url, artist, album):
         audio["tracknumber"] = str(index)
         audio.save()
 
-    # Create ZIP archive
     zip_path = zip_mp3s(output_dir, "playlist_download.zip")
     return len(mp3_files), zip_path
 
-# Streamlit UI
-st.title("YouTube Playlist to MP3 Converter + ZIP")
+# -------------------------
+# Streamlit App UI
+# -------------------------
 
-playlist_url = st.text_input("Enter the YouTube playlist URL:")
-artist = st.text_input("Enter artist name:")
-album = st.text_input("Enter album name:")
+st.title("🎵 YouTube Playlist to MP3 + ZIP")
 
-if st.button("Download, Tag, and Zip"):
+playlist_url = st.text_input("📺 YouTube Playlist URL")
+artist = st.text_input("🎤 Artist Name")
+album = st.text_input("💿 Album Name")
+
+if st.button("Download Playlist"):
     if playlist_url and artist and album:
-        with st.spinner("Downloading and processing..."):
-            total, zip_path = download_and_process(playlist_url, artist, album)
-        st.success(f"Done! {total} tracks processed.")
-        st.download_button("Download ZIP file", zip_path.read_bytes(), file_name="playlist_download.zip")
+        with st.spinner("Downloading and converting... please wait..."):
+            total_tracks, zip_file = download_and_process(playlist_url, artist, album)
+        st.success(f"✅ Done! {total_tracks} tracks downloaded and tagged.")
+        with open(zip_file, "rb") as f:
+            st.download_button(
+                label="⬇️ Download ZIP",
+                data=f,
+                file_name="playlist_download.zip",
+                mime="application/zip"
+            )
     else:
-        st.warning("Please fill in all fields before continuing.")
+        st.warning("⚠️ Please fill in all fields before continuing.")
