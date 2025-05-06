@@ -39,7 +39,7 @@ def download_and_process(playlist_url, artist, album):
             title = file_path.stem
 
         track_num = f"{index:02d}"
-        formatted_title = f'{track_num} - "{title}"'
+        formatted_title = f'{track_num} - {title}'
         new_filename = f"{track_num} - {sanitize_filename(title)}.mp3"
         new_file_path = file_path.with_name(new_filename)
         os.rename(file_path, new_file_path)
