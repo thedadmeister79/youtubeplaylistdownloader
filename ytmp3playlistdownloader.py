@@ -1,6 +1,6 @@
 import os
 import subprocess
-from mutagen.easyid3 import EasyID3
+from mutagen.id3 import ID3, TIT2, TALB, TPE1, TRCK
 from pathlib import Path
 import re
 import streamlit as st
@@ -37,16 +37,19 @@ def download_and_process(playlist_url, artist, album):
             title = file_path.stem.split(" - ", 1)[1]
         except IndexError:
             title = file_path.stem
+
         track_num = f"{index:02d}"
+        formatted_title = f'{track_num} - "{title}"'
         new_filename = f"{track_num} - {sanitize_filename(title)}.mp3"
         new_file_path = file_path.with_name(new_filename)
         os.rename(file_path, new_file_path)
 
-        audio = EasyID3(new_file_path)
-        audio["title"] = title
-        audio["artist"] = artist
-        audio["album"] = album
-        audio["tracknumber"] = str(index)
+        # Set full ID3 tags with formatting
+        audio = ID3(new_file_path)
+        audio["TIT2"] = TIT2(encoding=3, text=formatted_title)
+        audio["TPE1"] = TPE1(encoding=3, text=artist)
+        audio["TALB"] = TALB(encoding=3, text=album)
+        audio["TRCK"] = TRCK(encoding=3, text=str(index))
         audio.save()
 
     zip_path = zip_mp3s(output_dir, "playlist_download.zip")
