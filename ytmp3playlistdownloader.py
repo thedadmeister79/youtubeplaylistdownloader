@@ -1,18 +1,22 @@
 import os
 import subprocess
 from mutagen.easyid3 import EasyID3
-from mutagen.id3 import ID3, TIT2, TALB, TPE1
 from pathlib import Path
 import re
+import streamlit as st
+import zipfile
 
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', '', name)
 
-def main():
-    # Prompt for playlist URL
-    playlist_url = input("Enter the YouTube playlist URL: ").strip()
+def zip_mp3s(output_dir, zip_name):
+    zip_path = Path(output_dir) / zip_name
+    with zipfile.ZipFile(zip_path, 'w') as zipf:
+        for mp3_file in Path(output_dir).glob("*.mp3"):
+            zipf.write(mp3_file, arcname=mp3_file.name)
+    return zip_path
 
-    # Create output directory
+def download_and_process(playlist_url, artist, album):
     output_dir = "downloaded_mp3s"
     os.makedirs(output_dir, exist_ok=True)
 
@@ -31,19 +35,16 @@ def main():
 
     # Rename and tag files
     mp3_files = sorted(Path(output_dir).glob("*.mp3"))
-
-    print("\nTagging MP3 files...")
-    artist = input("Enter artist name: ").strip()
-    album = input("Enter album name: ").strip()
-
     for index, file_path in enumerate(mp3_files, start=1):
-        title = file_path.stem.split(" - ", 1)[1]
+        try:
+            title = file_path.stem.split(" - ", 1)[1]
+        except IndexError:
+            title = file_path.stem
         track_num = f"{index:02d}"
         new_filename = f"{track_num} - {sanitize_filename(title)}.mp3"
         new_file_path = file_path.with_name(new_filename)
         os.rename(file_path, new_file_path)
 
-        # Set ID3 tags
         audio = EasyID3(new_file_path)
         audio["title"] = title
         audio["artist"] = artist
@@ -51,9 +52,22 @@ def main():
         audio["tracknumber"] = str(index)
         audio.save()
 
-        print(f"Tagged and renamed: {new_filename}")
+    # Create ZIP archive
+    zip_path = zip_mp3s(output_dir, "playlist_download.zip")
+    return len(mp3_files), zip_path
 
-    print("\nAll files processed successfully.")
+# Streamlit UI
+st.title("YouTube Playlist to MP3 Converter + ZIP")
 
-if __name__ == "__main__":
-    main()
+playlist_url = st.text_input("Enter the YouTube playlist URL:")
+artist = st.text_input("Enter artist name:")
+album = st.text_input("Enter album name:")
+
+if st.button("Download, Tag, and Zip"):
+    if playlist_url and artist and album:
+        with st.spinner("Downloading and processing..."):
+            total, zip_path = download_and_process(playlist_url, artist, album)
+        st.success(f"Done! {total} tracks processed.")
+        st.download_button("Download ZIP file", zip_path.read_bytes(), file_name="playlist_download.zip")
+    else:
+        st.warning("Please fill in all fields before continuing.")
