@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import streamlit as st
 import zipfile
+import shutil
 
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', '', name)
@@ -18,10 +19,15 @@ def zip_mp3s(output_dir, zip_name):
 
 def download_and_process(playlist_url, artist, album, log_area):
     output_dir = "downloaded_mp3s"
+
+    # Step 1: Clean old MP3s folder entirely
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
-    log_area.text("🟡 Starting download...")
+    log_area.text("🟡 Cleaned previous downloads...")
 
+    # Step 2: Start downloading
     ytdlp_command = [
         "yt-dlp",
         "-x",
@@ -38,13 +44,14 @@ def download_and_process(playlist_url, artist, album, log_area):
         universal_newlines=True
     )
 
-    output_log = ""
+    output_log = "📥 Downloading songs...\n"
     for line in process.stdout:
         output_log += line
-        log_area.text(output_log[-3000:])  # Limit visible output
+        log_area.text(output_log[-3000:])  # Stream output
 
     process.wait()
 
+    # Step 3: Process downloaded MP3s
     mp3_files = sorted(Path(output_dir).glob("*.mp3"))
 
     for index, file_path in enumerate(mp3_files, start=1):
@@ -69,21 +76,24 @@ def download_and_process(playlist_url, artist, album, log_area):
         output_log += f'\n✅ Tagged: {formatted_title}'
         log_area.text(output_log[-3000:])
 
-    zip_path = zip_mp3s(output_dir, "playlist_download.zip")
-    output_log += f"\n📦 Zipped all MP3s to: {zip_path.name}"
+    # Step 4: Zip the folder using album name
+    zip_name = f"{sanitize_filename(album)}.zip"
+    zip_path = zip_mp3s(output_dir, zip_name)
+
+    output_log += f"\n📦 Zipped all MP3s as: {zip_name}"
     log_area.text(output_log[-3000:])
 
     return len(mp3_files), zip_path
 
 # -------------------------
-# Streamlit App UI
+# Streamlit UI
 # -------------------------
 
 st.title("🎵 YouTube Playlist to MP3 + ZIP")
 
 playlist_url = st.text_input("📺 YouTube Playlist URL")
 artist = st.text_input("🎤 Artist Name")
-album = st.text_input("💿 Album Name")
+album = st.text_input("💿 Album Name (used for ZIP name too)")
 
 if st.button("Download Playlist"):
     if playlist_url and artist and album:
@@ -95,7 +105,7 @@ if st.button("Download Playlist"):
             st.download_button(
                 label="⬇️ Download ZIP",
                 data=f,
-                file_name="playlist_download.zip",
+                file_name=zip_file.name,
                 mime="application/zip"
             )
     else:
